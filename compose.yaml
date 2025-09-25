@@ -1,9 +1,27 @@
 services:
   postgres:
-    image: 'postgres:latest'
+    container_name: matchodds_db
+    image: postgres:latest
     environment:
-      - 'POSTGRES_DB=mydatabase'
-      - 'POSTGRES_PASSWORD=secret'
-      - 'POSTGRES_USER=myuser'
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
     ports:
-      - '5432'
+      - "5432:5432"
+    volumes:
+      - pgData:/var/lib/postgresql/data
+
+  match_odds:
+    container_name: match_odds
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/postgres
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=postgres
+      - HIBERNATE_DIALECT=org.hibernate.dialect.PostgreSQLDialect
+    depends_on:
+      - postgres
+volumes:
+  pgData: {}
