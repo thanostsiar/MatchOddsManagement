@@ -1,15 +1,21 @@
 package com.atsiaras.matchodds.exceptions;
 
 import com.atsiaras.matchodds.dtos.ErrorResponse;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -51,6 +57,41 @@ public class GlobalExceptionHandler {
         ErrorResponse body = new ErrorResponse(400, "Validation Failed", errors, req.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
+
+    // Invalid JSON / enum / date
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidFormat(
+            HttpMessageNotReadableException ex,
+            HttpServletRequest request) {
+
+        String msg = "Malformed JSON or invalid field type";
+        Throwable cause = ex.getCause();
+
+        if (cause instanceof InvalidFormatException formatEx) {
+            if (formatEx.getTargetType().isEnum()) {
+                Object[] allowed = formatEx.getTargetType().getEnumConstants();
+                msg = "Invalid value '" + formatEx.getValue() + "' for enum field. " +
+                        "Allowed values: " + Arrays.toString(allowed);
+            } else if (formatEx.getTargetType().equals(LocalDate.class)) {
+                msg = "Invalid date format '" + formatEx.getValue() +
+                        "'. Expected format: yyyy-MM-dd";
+            } else if (formatEx.getTargetType().equals(LocalTime.class)) {
+                msg = "Invalid time format '" + formatEx.getValue() +
+                        "'. Expected format: HH:mm";
+            }
+        }
+
+        ErrorResponse body = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                msg,
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.badRequest().body(body);
+    }
+
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
